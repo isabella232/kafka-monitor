@@ -157,6 +157,7 @@ public class MultiClusterTopicManagementService implements Service {
     @Override
     public void run() {
       try {
+	LOG.error("Starting TopicManagementRunnable");
         for (TopicManagementHelper helper : _topicManagementByCluster.values()) {
           helper.maybeCreateTopic();
         }
@@ -260,18 +261,21 @@ public class MultiClusterTopicManagementService implements Service {
       _topicFactory = (TopicFactory) Class.forName(topicFactoryClassName).getConstructor(Map.class).newInstance(topicFactoryConfig);
 
       _adminClient = constructAdminClient(props);
-      LOG.info("{} configs: {}", _adminClient.getClass().getSimpleName(), props);
+      LOG.error("{} configs: {}", _adminClient.getClass().getSimpleName(), props);
     }
 
     @SuppressWarnings("unchecked")
     void maybeCreateTopic() throws Exception {
+      LOG.error("maybeCreateTopic for {}: {}.", _topic, _topicCreationEnabled);
       if (_topicCreationEnabled) {
         int brokerCount = _adminClient.describeCluster().nodes().get().size();
         int numPartitions = Math.max((int) Math.ceil(brokerCount * _minPartitionsToBrokersRatio), minPartitionNum());
         NewTopic newTopic = new NewTopic(_topic, numPartitions, (short) _replicationFactor);
         newTopic.configs((Map) _topicProperties);
         CreateTopicsResult createTopicsResult = _adminClient.createTopics(Collections.singletonList(newTopic));
-        LOG.info("CreateTopicsResult: {}.", createTopicsResult.values());
+	// Wait for topic to be created...
+	createTopicsResult.values().get(_topic).get();
+        LOG.error("CreateTopicsResult: {}.", createTopicsResult.values());
       }
     }
 
